@@ -26,11 +26,13 @@ To get started with this project, you will need to have the following installed 
 * Maven
 * IntelliJ or a similar IDE
 
-Once you have these dependencies installed, you can clone the repository to your local machine and open the project in IntelliJ.
+### Building Required Libraries
 
-### Building the Project
+The project uses the `Parsnip` library, which you will need to clone and build separately. Clone the repository at https://github.com/aplpolaris/parsnip to your local machine and run the following command in the project root directory: `mvn clean install`. Alternately, you can open the project in IntelliJ
 
-To build the project, run the following command in the project root directory:
+### Building the CAGE-RGG Project
+
+Once you have these dependencies installed, you can clone the repository to your local machine and open the project in IntelliJ. To build the project, run the following command in the project root directory:
 
 * `mvn clean install`
 
