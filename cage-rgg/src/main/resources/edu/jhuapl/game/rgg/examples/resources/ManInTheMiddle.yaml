@@ -1,0 +1,152 @@
+# metadata for the game
+metadata:
+  id: ManInTheMiddle
+  description: Demonstrates the ability to find the shortest path from user to server without traversing through a node that has been attacked. If it is determined that all available paths would require the packet to traverse through nodes that have been attacked, the packet should be dropped.
+
+# teams in the game
+teams: [ blue ]
+
+# board on which the game is played
+board:
+  nodes: [p1, n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, server]
+  vectors:
+    - { from: p1, to: n1 }
+    - { from: p1, to: n2 }
+    - { from: n1, to: n3 }
+    - { from: n1, to: n4 }
+    - { from: n2, to: n4 }
+    - { from: n3, to: n5 }
+    - { from: n3, to: n6 }
+    - { from: n4, to: n5 }
+    - { from: n4, to: n6 }
+    - { from: n5, to: n7 }
+    - { from: n5, to: n8 }
+    - { from: n6, to: n8 }
+    - { from: n6, to: n10 }
+    - { from: n7, to: server }
+    - { from: n7, to: n9 }
+    - { from: n8, to: n9 }
+    - { from: n8, to: n10 }
+    - { from: n9, to: server }
+    - { from: n10, to: n9 }
+    - { from: n8, to: n6}
+    - { from: n9, to: n10}
+    - { from: n10, to: n8}
+
+# game resources associated with each node
+resourceSpace:
+  p1:
+    observable: set(blue)
+    ownership: false
+    dropped: false
+    capital: float(100.0)
+    moves: int(0)
+    reward: int(0)
+  n1:
+    observable: set(blue)
+    ownership: false
+    reward: int(-2)
+  n2:
+    observable: set(blue)
+    ownership: false
+    reward: int(-2)
+  n3:
+    observable: set(blue)
+    ownership: false
+    reward: int(-80)
+  n4:
+    observable: set(blue)
+    ownership: false
+    reward: int(-2)
+  n5:
+    observable: set(blue)
+    ownership: false
+    reward: int(-2)
+  n6:
+    observable: set(blue)
+    ownership: false
+    reward: int(-2)
+  n7:
+    observable: set(blue)
+    ownership: false
+    reward: int(-80)
+  n8:
+    observable: set(blue)
+    ownership: false
+    reward: int(-2)
+  n9:
+    observable: set(blue)
+    ownership: false
+    reward: int(-2)
+  n10:
+    observable: set(blue)
+    ownership: false
+    reward: int(-2)
+  server:
+    observable: set(blue)
+    ownership: false
+    reward: int(20)
+
+# possible actions that can be taken by each team
+actionSpace:
+  blue:
+    nothing:
+    drop:
+    move:
+
+# action definitions and constraints
+actions:
+  nothing: # do nothing
+    cost:
+      p1.capital: -1
+      p1.moves: 1
+    requires:
+      p1.capital: { Gte: 1 }
+    consequences: []
+  drop: # scan from node a
+    cost:
+      p1.capital: -40
+      p1.moves: 1
+    requires:
+      p1.capital: { Gte: 50 }
+    consequences:
+      - odds: 0.05
+        independent: true
+        result:
+          Resources:
+            put:
+              p1.dropped: true
+  move: # attack from random owned node to random other node
+    cost:
+      p1.capital: -2
+      p1.moves: 1
+    requires:
+      p1.capital: { Gte: 2 }
+    consequences:
+      - odds: 0.5
+        result:
+          WithRandomVector:
+            sourceFilter: { ownership: true } # conditions on source node
+            targetFilter: { ownership: false} # conditions on target node
+            result:
+              _target.ownership: true
+              p1.reward:
+                Field: _target.reward
+
+# reward space computes a numeric value from the state space, defined by a DatumCompute
+rewards:
+  blue:
+    Field: p1.reward
+
+# completion step computes a boolean value from the state space, defined by a DatumFilter
+completed:
+  Or:
+    - p1.dropped: true
+    - server.ownership: true
+    - p1.capital: { Lte: 0.0 }
+
+metrics:
+  - p1.capital
+  - p1.reward
+  - p1.moves
+  - p1.dropped

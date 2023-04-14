@@ -1,0 +1,84 @@
+# metadata for the game
+metadata:
+  id: MultiplayerTestRgg
+  description: This is a test deterministic game for integration testing
+
+# teams in the game
+teams: [ red, blue ]
+
+# board on which the game is played
+board:
+  nodes: [ a, b, c]
+  vectors:
+    - { from: a, to: b }
+    - { from: b, to: c }
+
+# game resources associated with each node
+resourceSpace:
+  a:
+    observable: set(red)
+    ownership: true
+    capital: int(20)
+    moves: int(0)
+  b:
+    observable: set(blue)
+    ownership: false
+  c:
+    observable: set(blue)
+    ownership: true
+    capital: int(20)
+    moves: int(0)
+
+# possible actions that can be taken by each team
+actionSpace:
+  red:
+    nothing:
+    scan:
+  blue:
+    do nothing:
+
+# action definitions and constraints
+actions:
+  nothing: # do nothing
+    cost:
+      a.capital: -1
+      a.moves: 1
+    requires:
+      a.capital: { Gte: 1 }
+    consequences: []
+  scan: # scan from node a
+    cost:
+      a.capital: -2
+      a.moves: 1
+    requires:
+      a.capital: { Gte: 1 }
+    consequences:
+      - odds: 1.0 # always be effective for testing purposes
+        result:
+          MakeNodeVisible:
+            team: red
+            sourceFilter: { _node: a }
+            targetFilter: { observable: { Not: { Contains: red } } }
+
+  # Blue team
+  do nothing:
+    cost:
+      c.capital: -1
+      c.moves: 1
+    requires:
+      c.capital: { Gte: 1 }
+    consequences: []
+
+# reward space computes a numeric value from the state space, defined by a DatumCompute
+rewards:
+  red:
+    Calculate: "-{a.capital}"
+  blue:
+    Calculate: "-{c.capital}"
+
+# completion step computes a boolean value from the state space, defined by a DatumFilter
+completed:
+  Or:
+#    - c.ownership: true # Problematic for multi-player.
+    - a.capital: { Lte: 0.0 }
+    - c.capital: { Lte: 0.0 }

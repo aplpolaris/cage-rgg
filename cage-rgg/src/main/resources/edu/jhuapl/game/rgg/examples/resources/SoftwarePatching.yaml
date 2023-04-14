@@ -1,0 +1,214 @@
+# metadata for the game
+metadata:
+  id: SoftwarePatching
+  description: Demonstrates a scenario where users must update their software to prevent a vulnerability.
+
+# teams in the game
+teams: [ red, blue ]
+
+# board on which the game is played
+board:
+  # nodes list out each participant in the game
+  nodes: [ game, attacker, a, b, c, d, e, f, g, h ]
+  # vectors enumerate the connections between the nodes (i.e., which nodes can communicate with each other)
+  vectors:
+    - { from: attacker, to: a }
+    - { from: attacker, to: d }
+    - { from: a, to: b }
+    - { from: b, to: c }
+    - { from: c, to: f }
+    - { from: d, to: e }
+    - { from: d, to: f }
+    - { from: e, to: h }
+    - { from: f, to: g }
+    - { from: g, to: h }
+
+# game resources associated with each node
+resourceSpace:
+  game:
+    observable: set(red, blue) # this node can see other nodes belonging to both the red and blue teams
+    # the following resources are used to track various metrics that are tracked during the game
+    blueAlerted: int.range(0; 0,1) # defines whether blue team knows it's being attacked
+    numTotal: int(0) # total number of nodes that have been patched/compromised
+    numPatched: int(0) # number of patched nodes
+    numCompromised: int(0) # number of compromised nodes
+    moves: int(0) # total number of moves
+    redReward: float(0) # cumulative red team reward
+    blueReward: float(0) # cumulative blue team reward
+    blueFatigue: int.range(35; 0, 35) # defines how many actions the blue team can take
+  attacker:
+    observable: set(red)
+    capital: int.range(25; 0, 25) # defines how many actions the red team can take
+    compromised: int.range(1; 0,1) # determines whether a node is compromised, and if so, attackers can use the node
+  a:
+    observable: set(red, blue) # needs to see red and blue so that it can remediate and patch
+    vulnerable: int.range(1; 0,1) # determines whether the node has been patched or not
+    compromised: int.range(0; 0,1) #determines whether the node has been compromised by the attacker
+    reward: int(1) # the reward given to red/blue depending on which team owns the node at the end of the game
+  b:
+    observable: set(red, blue)
+    vulnerable: int.range(1; 0,1)
+    compromised: int.range(0; 0,1)
+    reward: int(2)
+  c:
+    observable: set(red, blue)
+    vulnerable: int.range(1; 0,1)
+    compromised: int.range(0; 0,1)
+    reward: int(3)
+  d:
+    observable: set(red, blue)
+    vulnerable: int.range(1; 0,1)
+    compromised: int.range(0; 0,1)
+    reward: int(5)
+  e:
+    observable: set(red, blue)
+    vulnerable: int.range(1; 0,1)
+    compromised: int.range(0; 0,1)
+    reward: int(10)
+  f:
+    observable: set(red, blue)
+    vulnerable: int.range(1; 0,1)
+    compromised: int.range(0; 0,1)
+    reward: int(5)
+  g:
+    observable: set(red, blue)
+    vulnerable: int.range(1; 0,1)
+    compromised: int.range(0; 0,1)
+    reward: int(20)
+  h: # highest value target, takes a long time to reach
+    observable: set(red, blue)
+    vulnerable: int.range(1; 0,1)
+    compromised: int.range(0; 0,1)
+    reward: int(30)
+
+# possible actions that can be taken by each team
+actionSpace:
+  red: # red team can do nothing, or attack from a compromised node or via malware infection (i.e., blue node downloads malicious software)
+    redNothing:
+    externalAttack:
+    internalAttack:
+  blue: # blue team can do nothing, patch an uncompromised node, or fix (remediate) a compromised node
+    blueNothing:
+    patch:
+    remediate:
+
+# action definitions and constraints
+actions:
+  redNothing: # do nothing
+    cost: # what it costs to perform this move
+      game.moves: 1
+    requires: # what is required for this action to take place. If the attacker doesn't have the required capital, the move is not taken
+      attacker.capital: { Gte: 1 }
+    consequences: [] # no consequences since this action does nothing
+  externalAttack: # attack originating from a compromised node
+    cost:
+      attacker.capital: -1
+      game.moves: 1
+    requires:
+      attacker.capital: { Gte: 2 }
+    consequences: # the consequence of the action taking place
+      - odds: 1 # odds that the below result (target node is compromised) occurs
+        result: # result of the consequence
+          WithRandomVector: # selects a random vector that matches the filters listed below
+            sourceFilter: { compromised: 1 } # filter conditions on source node for the selected vector
+            targetFilter: { vulnerable: 1, compromised: 0 } # filter conditions on target node for the selected vector
+            result: # computed values after the above result is fulfilled
+              _target.compromised: 1 # target node is set to "compromised"
+              game.numCompromised: 1 # total number of compromised nodes increases
+              game.numTotal: 1 # total number of modified nodes increases
+              game.redReward: # red team receives a reward for compromising a node
+                Calculate: "{ _target.reward }" # red team gets reward equal to the target node's reward
+      - odds: 0.2 # odds that the blue team will discover the attack and begin patching
+        independent: true # the odds that this happens is independent of the previous consequence
+        result:
+          Resources:
+            put: # sets a value
+              game.blueAlerted: 1 # the blue team now knows that it's being attacked
+  internalAttack: # attack originating on any node. Tricking a user into a malware download, for example.
+    cost:
+      game.moves: 1
+    requires: {}
+    consequences:
+      - odds: 1
+        result:
+          WithRandomVector: # since source node doesn't matter here, all we care about is that the target is vulnerable
+            targetFilter: { vulnerable: 1, compromised: 0 } # conditions on target node
+            result:
+              _target.compromised: 1
+              game.numCompromised: 1
+              game.numTotal: 1
+              game.redReward:
+                Calculate: "{ _target.reward }"
+      - odds: 0.5 # odds that the blue team will discover the attack and begin patching
+        independent: true
+        result:
+          Resources:
+            put:
+              game.blueAlerted: 1
+
+
+  #blue team can patch with no cost
+  blueNothing: # do nothing
+    cost:
+      game.moves: 1
+      game.blueFatigue: -1
+    requires: {}
+    consequences: []
+  patch: # patch an unpatched node
+    cost:
+      game.blueFatigue: -1
+      game.moves: 1
+    requires:
+      game.blueFatigue: {Gte: 0}
+      game.blueAlerted: 1 # blue may only attempt to patch if they know they're being attacked
+    consequences:
+      - odds: 1
+        result:
+          WithRandomVector:
+            targetFilter: { compromised: 0, vulnerable: 1}
+            result:
+              _target.vulnerable: -1
+              game.numPatched: 1
+              game.numTotal: 1
+              game.blueReward:
+                Calculate: "{ _target.reward }"
+  remediate: # fix a compromised node
+    cost:
+      game.blueFatigue: -2
+      game.moves: 1
+    requires:
+      game.blueFatigue: {Gte: 1}
+      game.blueAlerted: 1 # blue may only attempt to remediate if they know they're being attacked
+    consequences:
+      - odds: 0.8
+        result:
+          WithRandomVector:
+            targetFilter: { compromised: 1, vulnerable: 1}
+            result:
+              _target.compromised: -1
+              game.numCompromised: -1
+              game.numTotal: -1
+              game.redReward:
+                Calculate: "- { _target.reward }"
+
+# reward space computes a numeric value for the overall score for each team
+rewards:
+  red: # red team overall reward is set to the total amount of reward it has accumulated through compromising nodes
+    Field: game.redReward
+  blue: # blue team overall reward is set to the total amount of reward it has accumulated through patching nodes
+    Field: game.blueReward
+
+
+# completion step computes a boolean value to determine whether the game has finished
+completed:
+  Or: # the game is complete when either the attacker runs out of capital or the blue team is fatigued
+  - attacker.capital: { Lte: 1.0 }
+  - game.blueFatigue: { Lte: 1.0 }
+  - game.moves: {Gte: 100}
+
+metrics: # the values that get printed to console after the game has run
+  - game.numTotal
+  - game.numPatched
+  - game.numCompromised
+  - attacker.capital
+  - game.blueFatigue

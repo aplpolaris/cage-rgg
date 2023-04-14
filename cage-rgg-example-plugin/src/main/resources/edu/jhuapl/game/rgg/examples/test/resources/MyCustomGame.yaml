@@ -1,0 +1,82 @@
+# metadata for the game
+metadata:
+  id: MyCustomGame
+
+# teams in the game
+teams: [ player ]
+
+# board on which the game is played
+board:
+  nodes: [ stats, input, output ]
+  vectors:
+    - {from: input, to: output }
+
+# game resources associated with each node
+resourceSpace:
+  stats:
+    observable: set([player]; [player])
+    reward: int(10)
+  input:
+    a: int(1)
+    b: int(1)
+    c: int(1)
+    d: int(1)
+  output:
+    unlock: boolean(false)
+
+# possible actions that can be taken by each team
+actionSpace:
+  player:
+    right_combo: {}
+    wrong_combo: {}
+
+# library of actions
+actions:
+  right_combo:
+    cost:
+      stats.reward: -1
+    requires: {}
+    consequences:
+      - odds: 1.0
+        result:
+          Resources:
+            put:
+              input.a: 5
+              input.b: 1
+              input.c: 2
+              input.d: 3
+      - odds: 1.0
+        independent: true
+        result:
+          MyCustomResultFunction: { input: input, output: output }
+
+  wrong_combo:
+    cost:
+      stats.reward: -1
+    requires: {}
+    consequences:
+      - odds: 1.0
+        result:
+          Resources:
+            put:
+              input.a:
+                Calculate: "floor(randbetween(0, 10))"
+              input.b:
+                Calculate: "floor(randbetween(0, 10))"
+              input.c:
+                Calculate: "floor(randbetween(0, 10))"
+              input.d:
+                Calculate: "floor(randbetween(0, 10))"
+      - odds: 1.0
+        independent: true
+        result:
+          MyCustomResultFunction: { input: input, output: output }
+
+# reward space computes a numeric value from the state space, defined by a DatumCompute
+rewards:
+  player:
+    Field: stats.reward
+
+# completion step computes a boolean value from the state space, defined by a DatumFilter
+completed:
+  output.unlock: true

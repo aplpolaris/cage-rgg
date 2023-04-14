@@ -1,0 +1,222 @@
+# metadata for the game
+metadata:
+  id: APT
+  description: Demonstrates a two-phase game where the user takes "quiet" actions in the first phase to avoid detection, then "noisy" actions in the second phase to gain rewards quickly.
+
+# teams in the game
+teams: [ red ]
+
+# board on which the game is played
+board:
+  nodes: [ game, base, p1, p2, p3, p4, p5, p6, p7, p8, g1, g2, g3, g4, g5, g6, g7, g8 ]
+  vectors:
+    - { from: base, to: p1 }
+    - { from: p1, to: p2 }
+    - { from: p2, to: p3 }
+    - { from: p3, to: p4 }
+    - { from: p4, to: p5 }
+    - { from: p5, to: p6 }
+    - { from: p6, to: p7 }
+    - { from: p7, to: p8 }
+    - { from: p8, to: g1 }
+    - { from: p8, to: g2 }
+    - { from: p8, to: g3 }
+    - { from: p8, to: g4 }
+    - { from: p8, to: g5 }
+    - { from: p8, to: g6 }
+    - { from: p8, to: g7 }
+    - { from: p8, to: g8 }
+
+# game resources associated with each node
+resourceSpace:
+  game:
+    observable: set(red)
+    war: false
+    moves: int(0)
+    multiplier: int(1)
+  base:
+    observable: set(red)
+    capital: int(200)
+    own: true
+    reward: int(0)
+    exploits: int(0)
+  p1:
+    observable: set(red)
+    own: false
+    reward: int(2)
+  p2:
+    observable: set(red)
+    own: false
+    reward: int(2)
+  p3:
+    observable: set(red)
+    own: false
+    reward: int(2)
+  p4:
+    observable: set(red)
+    own: false
+    reward: int(2)
+  p5:
+    observable: set(red)
+    own: false
+    reward: int(2)
+  p6:
+    observable: set(red)
+    own: false
+    reward: int(2)
+  p7:
+    observable: set(red)
+    own: false
+    reward: int(2)
+  p8:
+    observable: set(red)
+    own: false
+    reward: int(2)
+  g1:
+    observable: set(red)
+    own: false
+    reward: int(5)
+  g2:
+    observable: set(red)
+    own: false
+    reward: int(10)
+  g3:
+    observable: set(red)
+    own: false
+    reward: int(12)
+  g4:
+    observable: set(red)
+    own: false
+    reward: int(10)
+  g5:
+    observable: set(red)
+    own: false
+    reward: int(10)
+  g6:
+    observable: set(red)
+    own: false
+    reward: int(6)
+  g7:
+    observable: set(red)
+    own: false
+    reward: int(15)
+  g8:
+    observable: set(red)
+    own: false
+    reward: int(10)
+
+# possible actions that can be taken by each team
+actionSpace:
+  red:
+    nothing:
+    low:
+    med:
+    high:
+
+# library of actions
+actions:
+  nothing: # do nothing
+    cost:
+      base.capital: -1
+      game.moves: 1
+    requires:
+      base.capital: { Gte: 1 }
+    consequences: []
+
+  low: # attempt move with low probability of success and low probability of detection
+    cost:
+      base.capital: -1
+      game.moves: 1
+    requires:
+      base.capital: { Gte: 1 }
+    consequences:
+      - odds: 0.15
+        result:
+          WithRandomVector:
+            sourceFilter: { own: true }
+            targetFilter: { own: false }
+            result:
+              _target.own: true
+              base.exploits: 1
+              base.reward:
+                Calculate: "{game.multiplier} * {_target.reward}"
+      - odds: 0.01
+        independent: true
+        result:
+          Resources:
+            put:
+              game.war: true
+              game.multiplier: 10
+
+  med: # attempt move with medium probability of success and medium probability of detection; success rates decline quickly with each use
+    cost:
+      base.capital: -3
+      game.moves: 1
+    requires:
+      base.capital: { Gte: 3 }
+    consequences:
+      - odds: 0.4
+        odds.discount: 0.95 # success declines exponentially with each attempted use
+        result:
+          WithRandomVector:
+            sourceFilter: { own: true }
+            targetFilter: { own: false }
+            result:
+              _target.own: true
+              base.exploits: 1
+              base.reward:
+                Calculate: "2 * {game.multiplier} * {_target.reward}"
+      - odds: 0.05
+        independent: true
+        result:
+          Resources:
+            put:
+              game.war: true
+              game.multiplier: 10
+
+  high: # attempt move with high probability of success and high probability of detection; success rates decline quickly with each use
+    cost:
+      base.capital: -5
+      game.moves: 1
+    requires:
+      base.capital: { Gte: 5 }
+    consequences:
+      - odds: 1.0
+        odds.discount: 0.8 # success declines exponentially with each attempted use
+        result:
+          WithRandomVector:
+            sourceFilter: { own: true }
+            targetFilter: { own: false }
+            result:
+              _target.own: true
+              base.exploits: 1
+              base.reward:
+                Calculate: "5 * {game.multiplier} * {_target.reward}"
+      - odds: 0.5
+        independent: true
+        result:
+          Resources:
+            put:
+              game.war: true
+              game.multiplier: 10
+
+# reward space computes a numeric value from the state space, defined by a DatumCompute
+rewards:
+  red:
+    Field: base.reward
+
+# completion step computes a boolean value from the state space, defined by a DatumFilter
+completed:
+  Or:
+    - game.moves: { Gte: 100 }
+    - base.capital: { Lte: 0 }
+
+# metrics to compute/log at the end of a run
+# note that reward functions are automatically logged
+metrics:
+  - game.war
+  - game.moves
+  - game.multiplier
+  - base.exploits
+  - base.capital
+  - base.reward

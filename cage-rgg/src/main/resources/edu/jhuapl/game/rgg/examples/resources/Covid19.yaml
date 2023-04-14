@@ -1,0 +1,105 @@
+# metadata for the game
+metadata:
+  id: Covid19
+
+# teams in the game
+teams: [ virus, humans ]
+
+# board on which the game is played
+board:
+  nodes: [ game, disease, population ]
+  vectors: []
+
+# game resources associated with each node
+resourceSpace:
+  game:
+    moves: int(0)
+    djia: float.range(30000; 0, 50000)
+  disease:
+    r0: float.range(3.0; 0.0,10.0)
+    recoveryRate: float.range(0.1; 0.0,1.0)
+    deathRate: float.range(0.01; 0.0,1.0)
+  population:
+    count: int.range(1000000; 0,1000000)
+    susceptible: int.range(999995; 0,1000000)
+    infected: int.range(5; 0,1000000)
+    recovered: int.range(0; 0,1000000)
+    dead: int.range(0; 0,1000000)
+
+# possible actions that can be taken by each team
+actionSpace:
+  virus:
+    spread:
+  humans:
+    do nothing:
+    social distancing:
+
+# library of actions
+actions:
+  # virus behavior
+  spread:
+    cost: {}
+    requires: {}
+    consequences:
+      - odds: 1.0
+        result:
+          Resources:
+            compute:
+              newInfected: { Calculate: "5 * {disease.r0} * {disease.recoveryRate} * {population.susceptible} * {population.infected} / {population.count}" }
+              newRecovered: { Calculate: "{disease.recoveryRate} * {population.infected}" }
+              newDeath: { Calculate: "{disease.deathRate} * {population.infected}" }
+            add:
+              population.susceptible: { Calculate: "-{newInfected}" }
+              population.infected: { Calculate: "{newInfected} - {newRecovered} - {newDeath}" }
+              population.recovered: { Field: "newRecovered" }
+              population.dead: { Field: "newDeath" }
+
+  # human behavior
+  do nothing:
+    cost:
+      game.moves: 1
+      game.djia: -100.0
+    requires: {}
+    consequences:
+      - odds: 1.0
+        result:
+          Resources:
+            add:
+              disease.r0: 0.2
+              game.djia: 0.0
+
+  # human behavior
+  social distancing:
+    cost:
+      game.moves: 1
+      game.djia: -1000.0
+    requires: {}
+    consequences:
+      - odds: 1.0
+        result:
+          Resources:
+            add:
+              disease.r0: -0.2
+              game.djia: 0.0
+
+# reward space computes a numeric value from the state space, defined by a DatumCompute
+rewards:
+  virus:
+    Field: population.infected
+  humans:
+    Calculate: "-{population.dead}"
+
+# completion step computes a boolean value from the state space, defined by a DatumFilter
+completed:
+  Or:
+    - game.moves: { Gte: 365 }
+    - population.infected: 0
+    - game.djia: { Lte: 0 }
+
+metrics:
+  - game.moves
+  - game.djia
+  - population.susceptible
+  - population.infected
+  - population.recovered
+  - population.dead

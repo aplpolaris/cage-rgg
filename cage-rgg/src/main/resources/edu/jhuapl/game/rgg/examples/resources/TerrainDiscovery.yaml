@@ -1,0 +1,115 @@
+# metadata for the game
+metadata:
+  id: TerrainDiscovery
+  description: Demonstrates the need to scan before attacking to discover new shorter paths to target.
+
+# teams in the game
+teams: [ red ]
+
+# board on which the game is played
+board:
+  nodes: [ a, b, c, d, e, f, g, h ]
+  vectors:
+    - { from: a, to: b }
+    - { from: b, to: c }
+    - { from: c, to: d }
+    - { from: d, to: e }
+    - { from: e, to: f }
+    - { from: f, to: g }
+    - { from: a, to: h }
+    - { from: h, to: g }
+
+# game resources associated with each node
+resourceSpace:
+  a:
+    observable: set(red)
+    ownership: true
+    capital: int.range(20; -20, 200)
+    moves: int.range(0, 100)
+  b:
+    observable: set(red)
+    ownership: false
+  c:
+    observable: set(red)
+    ownership: false
+  d:
+    observable: set(red)
+    ownership: false
+  e:
+    observable: set(red)
+    ownership: false
+  f:
+    observable: set(red)
+    ownership: false
+  g:
+    observable: set(red)
+    ownership: false
+  h:
+    observable: set()
+    ownership: false
+
+# possible actions that can be taken by each team
+actionSpace:
+  red:
+    nothing:
+    scan:
+      source: string.enum( a, b, c, d, e, f, g, h )
+    attack:
+      target: string.enum( a, b, c, d, e, f, g, h )
+
+# action definitions and constraints
+actions:
+  nothing: # do nothing
+    cost:
+      a.capital: -1
+      a.moves: 1
+    requires:
+      a.capital: { Gte: 1 }
+    consequences: []
+  scan: # scan from node a
+    cost:
+      a.capital: -1
+      a.moves: 1
+    requires:
+      a.capital: { Gte: 1 }
+    consequences:
+      - odds: 0.9
+        result:
+          MakeNodeVisible:
+            team: red
+            sourceFilter: { ownership: true }
+            targetFilter: { observable: { Not: { Contains: red } } }
+  attack: # attack from random owned node to random other node
+    cost:
+      a.capital: -2
+      a.moves: 1
+    requires:
+      a.capital: { Gte: 2 }
+    consequences:
+      - odds: 0.5
+        result:
+          WithRandomVector:
+            sourceFilter: { ownership: true } # conditions on source node
+            targetFilter: { ownership: false, observable: { Contains: red } } # conditions on target node
+            result: { _target.ownership: true }
+
+# reward space computes a numeric value from the state space, defined by a DatumCompute
+rewards:
+  red:
+    Condition:
+      - when: { g.ownership: false }
+        value: { Constant: -1 }
+      - when: { g.ownership: true }
+        value:
+          Calculate: "({a.capital} + 100)/2"
+
+# completion step computes a boolean value from the state space, defined by a DatumFilter
+completed:
+  Or:
+  - g.ownership: true
+  - a.capital: { Lte: 0.0 }
+
+metrics:
+  - a.capital
+  - a.moves
+  - g.ownership
